@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CS348Bolt — Learn SQL &amp; Relational Algebra</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ruda:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="page">
+  <div class="site-header">
+    <div>
+      <a class="logo" href="index.html">CS348<span>Bolt</span></a>
+      <div class="tagline">Learn SQL &amp; relational algebra with simple, interactive exercises.</div>
+    </div>
+    <div class="nav">
+      <a href="lesson.html?id=1">Interactive Tutorial</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1>Interactive lessons for CS 348 — Midterm 2</h1>
+    <p class="intro">
+      A SQLBolt-style tutorial built from the lecture handouts:
+      <b>Module 3 (Basic SQL)</b>, <b>Module 4 (Relational Algebra)</b> and
+      <b>Module 5 (Advanced SQL)</b>. Every lesson uses the lecture schemas — the
+      bibliography database and the ACCOUNT/BANK instance — on an extended data set, with
+      exercises pitched at midterm level. Queries run live in your browser as you type:
+      SQL on SQLite (via sql.js), and relational algebra on a purpose-built
+      σ π ρ × ∪ − interpreter.
+    </p>
+    <p class="intro">
+      Work through the lessons in order, or jump to a topic. Your progress is saved in the
+      browser.
+    </p>
+
+    <div id="lesson-index"></div>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/lessons.js"></script>
+<script src="js/engine-ra.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
