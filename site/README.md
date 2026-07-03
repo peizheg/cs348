@@ -9,6 +9,9 @@ A SQLBolt-style tutorial site covering the five lecture handouts:
   quizzes; concepts and terminology only, no code/syntax, per the professor)
 - **Part 5 (Lessons 26–29):** Module 7 — The ER Model (reading + self-check
   quizzes)
+- **Part 6 (Lesson 30):** Final review — a glossary of every red-highlighted
+  term from all five handouts (extracted from the PDFs by text color), with a
+  terminology quiz
 
 Every SQL/RA lesson uses the lecture schemas (the bibliography database and the
 ACCOUNT/BANK instance) on an extended data set: all slide rows are present,

@@ -104,6 +104,9 @@ pre {
 pre .kw { color: #5d5c58; }
 pre.out { color: #444; background: #eeece3; }
 
+/* "Red words" — key terms highlighted red, as on the lecture slides */
+b.rw { color: #c0392b; }
+
 .note {
   background: #f3efdf;
   border: 1px solid #e2ddc6;
