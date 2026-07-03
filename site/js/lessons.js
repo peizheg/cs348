@@ -1,7 +1,8 @@
 /* Lesson content for the CS 348 Midterm 2 tutorial.
  * Content follows the lecture handouts:
  *   Part 1 = Module 3 (Basic SQL), Part 2 = Module 4 (Relational Algebra),
- *   Part 3 = Module 5 (Advanced SQL).
+ *   Part 3 = Module 5 (Advanced SQL), Part 4 = Module 6 (Embedded SQL),
+ *   Part 5 = Module 7 (The ER Model).
  *
  * Lesson fields:
  *   type: "sql" (interactive SQL console) | "ra" (relational algebra console)
@@ -18,6 +19,9 @@
 const PART1 = "Part 1 · Basic SQL (Module 3)";
 const PART2 = "Part 2 · Relational Algebra (Module 4)";
 const PART3 = "Part 3 · Advanced SQL (Module 5)";
+const PART4 = "Part 4 · Embedded SQL (Module 6)";
+const PART5 = "Part 5 · The ER Model (Module 7)";
+const PART6 = "Part 6 · Final review";
 
 const LESSONS = [
 
@@ -1357,6 +1361,805 @@ grant PAT to Jim                  -- add Jim to the payroll project team</pre>
       prompt: "Which statement lets the payroll team member Jim query the EMPLOYEE table, given that role PAT already has select on EMPLOYEE?",
       choices: ["grant connect on PAYROLL to Jim", "grant select on PAT to Jim", "grant PAT to Jim", "revoke PAT from Jim"],
       answer: 2 }
+  ]
+},
+
+/* ============================================================ Lesson 24 */
+{
+  id: 24, part: PART4, type: "reading",
+  title: "Database applications: static embedded SQL",
+  html: `
+<p>Real applications are not interactive SQL sessions — they are programs written in a
+host language (C, Java, Python, …) that need to talk to the database. Module 6 surveys
+the main ways of structuring such applications. Per the professor: you do <b>not</b> need
+to memorize code or syntax — focus on the <em>general application design approach</em>,
+the <em>distinctions among the approaches</em>, and the <em>major terminology</em>.</p>
+
+<h3>Static embedded SQL</h3>
+
+<p>With <b>static embedded SQL</b>, SQL statements are written directly inside the host
+language source, marked with <code>EXEC SQL</code>. A <b>preprocessor</b> translates the
+source file (e.g. a <code>.sqc</code> file) into a pure host-language program in which
+every embedded statement has been replaced by <em>library calls</em>. The SQL itself is
+extracted, compiled and optimized ahead of time and <em>bound</em> to the database
+(the <code>PREP</code>/<code>BIND</code> step).</p>
+
+<pre class="out">app.sqc ──(preprocessor)──▶ app.c + bind file ──(compile/link)──▶ executable
+                                    │
+                                (BIND to DB)──▶ query plans stored in the database</pre>
+
+<p>Because the statements are compiled and bound in advance, static embedded SQL gives
+<b>compile-time checking</b> of the SQL and very efficient execution — but the resulting
+program is <b>bound to a particular RDBMS engine</b> (e.g. DB2): you cannot switch
+database systems without re-preprocessing and re-binding.</p>
+
+<h3>Application structure</h3>
+
+<p>A typical embedded-SQL application: include the <b>SQL communication area</b>
+(<code>SQLCA</code>), declare <b>host variables</b>, connect to the database, do the
+work, handle errors, then commit (or roll back) and disconnect.</p>
+
+<h3>Host variables</h3>
+
+<p><b>Host variables</b> are ordinary program variables used inside SQL statements,
+written with a colon prefix (<code>:acctno</code>). They must be declared in a special
+<code>DECLARE SECTION</code>, and each one carries a <b>single scalar value</b> — a
+number or a string, never a whole table.</p>
+
+<h3>Error handling and NULLs</h3>
+
+<p>After each statement the system sets a status code (<code>sqlcode</code>): 0 means
+success, positive values are warnings (100 = no data), negative values are errors.
+Rather than checking it manually every time, the program can declare handlers:</p>
+
+<pre class="sql">EXEC SQL WHENEVER SQLERROR GO TO error_exit;
+EXEC SQL WHENEVER NOT FOUND GO TO done;</pre>
+
+<p>Since host variables cannot hold NULL, each output host variable can be paired with
+an <b>indicator variable</b>: after a fetch, indicator &lt; 0 means the value was NULL
+(the host variable's content is then meaningless). Retrieving a NULL <em>without</em> an
+indicator variable is a run-time error.</p>
+
+<h3>The impedance mismatch and cursors</h3>
+
+<p>SQL is set-at-a-time; host languages process one value at a time. This is the
+<b>impedance mismatch</b>. A <code>SELECT ... INTO :var</code> works only when the query
+returns <em>at most one row</em>. For multi-row results, embedded SQL uses a
+<b>cursor</b> — an iterator over the result:</p>
+
+<pre class="sql">EXEC SQL DECLARE c CURSOR FOR select-statement;
+EXEC SQL OPEN c;
+EXEC SQL FETCH c INTO :v1, :v2;   -- repeat until NOT FOUND
+EXEC SQL CLOSE c;</pre>
+`,
+  tasks: [
+    { quiz: true,
+      prompt: "In static embedded SQL, what does the preprocessor do?",
+      choices: ["Interprets SQL statements at run time",
+                "Replaces embedded SQL with host-language library calls and extracts the SQL for binding",
+                "Translates the host language into SQL",
+                "Checks user privileges before compilation"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "What is the main drawback of static embedded SQL?",
+      choices: ["No compile-time checking of SQL statements",
+                "Queries cannot take parameters",
+                "The application is bound to a particular RDBMS engine",
+                "It cannot handle transactions"],
+      answer: 2 },
+    { quiz: true,
+      prompt: "What can a host variable hold?",
+      choices: ["A whole result table", "A single row", "A single scalar value", "A cursor"],
+      answer: 2 },
+    { quiz: true,
+      prompt: "Which mechanism solves the impedance mismatch between set-at-a-time SQL and one-value-at-a-time host languages?",
+      choices: ["Indicator variables", "The SQLCA", "Cursors (declare / open / fetch / close)", "WHENEVER handlers"],
+      answer: 2 },
+    { quiz: true,
+      prompt: "How does an embedded-SQL program detect that a fetched value was NULL?",
+      choices: ["The host variable is set to zero",
+                "Its indicator variable is negative",
+                "sqlcode is set to 100",
+                "The fetch fails with SQLERROR"],
+      answer: 1 }
+  ]
+},
+
+/* ============================================================ Lesson 25 */
+{
+  id: 25, part: PART4, type: "reading",
+  title: "Stored procedures and dynamic SQL (ODBC)",
+  html: `
+<p>Two more ways to structure a database application: move logic <em>into</em> the
+server, or keep everything in the host language and construct SQL <em>at run time</em>.</p>
+
+<h3>Stored procedures</h3>
+
+<p>A <b>stored procedure</b> is application logic that executes <em>inside the database
+server</em>, written either in a host language or in the SQL standard's own procedural
+language (<b>SQL/PSM</b>). Reasons to use them:</p>
+
+<p>• <b>Reduce data transfer</b> between client and server — the computation happens
+where the data lives.<br>
+• <b>Centralize application code</b> — every client uses the same, single copy of the
+logic.<br>
+• <b>Enhance the conceptual schema</b> — a procedure or function can act like a derived
+part of the schema: <em>atomic</em> functions return a single value, <em>table</em>
+functions return a relation that can be used in <code>FROM</code>.</p>
+
+<h3>Dynamic SQL with a call-level interface (ODBC)</h3>
+
+<p><b>ODBC</b> (Open DataBase Connectivity) is SQL's <b>call-level interface</b> (CLI):
+a library of functions for the host language. The application is developed <em>entirely
+in the host language</em> — no preprocessor — and every SQL statement is a plain string
+handed to the library at run time. Consequences:</p>
+
+<p>• <b>No compile-time checking</b> of the SQL (and the code is less transparent than
+embedded SQL).<br>
+• All statements are <b>dynamic</b>: constructed and prepared while the program runs.<br>
+• The program is <b>not bound to one engine</b> — a single thread can even talk to
+several different DBMS engines at once, via drivers.</p>
+
+<h3>ODBC terminology</h3>
+
+<p>Work happens through three kinds of <b>handles</b>: an <b>environment</b> handle (one
+per program thread), a <b>connection</b> handle (one per database connection) and
+<b>statement</b> handles. Statements may contain <code>?</code> <b>parameter
+markers</b>, bound to program variables before execution — the programmer is responsible
+for getting the types right.</p>
+
+<pre class="out">SQLPrepare + SQLExecute   compile once, run many times (with new parameters)
+SQLExecDirect             prepare-and-run in one shot, for one-off statements
+SQLBindCol / SQLGetData   bind result columns before fetching / read them after
+SQLFetch                  advance through the result set, row by row
+SQLRowCount               how many rows an update/delete touched</pre>
+
+<p>Transactions <b>start implicitly</b> with the first statement and end only with an
+explicit <code>SQLTransact(SQL_COMMIT)</code> or <code>SQLTransact(SQL_ROLLBACK)</code>.</p>
+
+<div class="note"><b>Exam checklist.</b> Embedded SQL: preprocessor, compile-time
+checking, engine-bound, cursors. ODBC: library calls, run-time SQL strings, no
+compile-time checking, engine-independent. Stored procedures: logic at the server, less
+data transfer, shared code.</div>
+`,
+  tasks: [
+    { quiz: true,
+      prompt: "Which is NOT one of the lecture's reasons for using stored procedures?",
+      choices: ["Reduce data transfer between client and server",
+                "Centralize application code at the server",
+                "Enhance the conceptual schema with derived functions",
+                "Avoid the need for transactions"],
+      answer: 3 },
+    { quiz: true,
+      prompt: "How does an ODBC application differ from static embedded SQL at build time?",
+      choices: ["It requires a special preprocessor",
+                "It is developed entirely in the host language, so there is no preprocessing and no compile-time SQL checking",
+                "Its SQL is compiled and bound to the database in advance",
+                "It cannot use parameters in queries"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "Which sequence of ODBC handles must be allocated, in order, before executing a statement?",
+      choices: ["statement → connection → environment",
+                "environment → connection → statement",
+                "connection → environment → statement",
+                "Only a statement handle is needed"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "When is SQLPrepare + SQLExecute preferred over SQLExecDirect?",
+      choices: ["When the statement runs many times (compile once, execute repeatedly with new parameter values)",
+                "When the statement runs exactly once",
+                "When the statement returns no results",
+                "When compile-time type checking is required"],
+      answer: 0 },
+    { quiz: true,
+      prompt: "How do transactions work in ODBC?",
+      choices: ["Each statement is its own transaction",
+                "They must be started with an explicit BEGIN call",
+                "They start implicitly and end with SQLTransact(COMMIT or ROLLBACK)",
+                "ODBC does not support transactions"],
+      answer: 2 }
+  ]
+},
+
+/* ============================================================ Lesson 26 */
+{
+  id: 26, part: PART5, type: "reading",
+  title: "The ER model: entities, attributes and relationships",
+  html: `
+<p>Before creating tables, a database designer captures the <em>metadata</em> of the
+application in a <b>conceptual data model</b>. The standard choice is the
+<b>Entity-Relationship (ER) model</b> (Chen, 1976), drawn as <b>ER diagrams</b>:
+rectangles for entity sets, ovals for attributes, diamonds for relationship sets.</p>
+
+<h3>Entities and attributes</h3>
+
+<p>An <b>entity</b> is a distinguishable object in the application (a particular
+student, a particular course). An <b>entity set</b> is a collection of entities of the
+same kind — this is what appears in the diagram. An <b>attribute</b> records a concrete
+fact about an entity (StudentNum, CourseName) and draws its values from a
+<b>domain</b> (integers, strings, dates).</p>
+
+<pre class="out">          ┌─────────┐                    ┌─────────┐
+ (Name)───│ STUDENT │────◇ EnrolledIn ◇──│ COURSE  │───(Title)
+ (StuNum)─│         │                    │         │───(CNum)
+          └─────────┘                    └─────────┘</pre>
+
+<h3>Relationships</h3>
+
+<p>A <b>relationship</b> is an association between two or more entities; a
+<b>relationship set</b> collects relationships of the same kind. A key modelling rule:
+a relationship is <b>uniquely determined by the entities that participate in it</b> —
+even when it carries attributes of its own. If Team A plays Team B, one <em>Match</em>
+relationship exists between them, and an attribute like <code>Score</code> describes
+that pairing; there cannot be two distinct Match relationships between the same two
+teams.</p>
+
+<h3>Roles</h3>
+
+<p>When one entity set participates in a relationship set more than once, each
+participation is labelled with a <b>role</b>. A Match between two teams needs roles to
+distinguish them:</p>
+
+<pre class="out">          HomeTeam ┌──────┐
+        ┌──────────│ TEAM │──────────┐
+        ▼          └──────┘          ▼
+   ◇ Match ◇◄────────────────── Visitor
+        │
+     (Score)</pre>
+`,
+  tasks: [
+    { quiz: true,
+      prompt: "What is the role of the ER model in database design?",
+      choices: ["It defines the physical storage layout",
+                "It is a conceptual data model capturing the application's metadata before tables are designed",
+                "It is a query language for relations",
+                "It specifies transaction isolation levels"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "In the ER model, a relationship is uniquely determined by…",
+      choices: ["its attributes",
+                "the entities that participate in it",
+                "its name",
+                "its primary key attribute"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "Team A plays Team B and the match has a Score. How is Score modelled?",
+      choices: ["As an attribute of TEAM",
+                "As a separate entity set",
+                "As an attribute of the Match relationship set",
+                "As a role name"],
+      answer: 2 },
+    { quiz: true,
+      prompt: "When are role names required on a relationship set?",
+      choices: ["Whenever the relationship has attributes",
+                "When an entity set participates in the relationship set more than once",
+                "When the relationship is many-to-many",
+                "Roles are always required"],
+      answer: 1 }
+  ]
+},
+
+/* ============================================================ Lesson 27 */
+{
+  id: 27, part: PART5, type: "reading",
+  title: "ER integrity constraints",
+  html: `
+<p>ER diagrams can express four graphical varieties of integrity constraints:
+<b>primary keys</b>, <b>binary relationship types</b>, <b>existence dependencies</b> and
+<b>general cardinality constraints</b>.</p>
+
+<h3>1 · Primary keys</h3>
+
+<p>A set of attributes whose values uniquely identify each entity in an entity set —
+drawn by <b>underlining</b> the attribute names.</p>
+
+<h3>2 · Types of binary relationships</h3>
+
+<p>Arrowheads on the edges classify a binary relationship set as many-to-many
+(<b>N:N</b>, no arrows), many-to-one (<b>N:1</b>, arrow into the "one" side), one-to-many
+(<b>1:N</b>) or one-to-one (<b>1:1</b>, arrows on both sides). An arrow means: each
+entity on the tail side relates to <em>at most one</em> entity on the head side.
+Important: none of these imply that participation is <em>mandatory</em> — an entity may
+participate in no relationship at all.</p>
+
+<pre class="out">STUDENT ──── ◇ EnrolledIn ◇ ──── COURSE        N:N
+COURSE  ──── ◇ TaughtBy   ◇ ───▶ PROFESSOR     N:1  (each course has ≤ 1 professor)</pre>
+
+<h3>3 · Existence dependencies and weak entity sets</h3>
+
+<p>Some entities cannot exist without another: an entity set may be <b>subordinate</b>
+to a <b>dominant</b> entity set, drawn with <b>double boundaries</b> on the subordinate
+(weak) entity set and its <b>identifying relationship</b> (double diamond). A <b>weak
+entity set</b> has no key of its own; instead it has a <b>discriminator</b> (dashed
+underline) that distinguishes its entities <em>among those related to the same dominant
+entity</em>. Its primary key is:</p>
+
+<pre class="out">PK(weak) = discriminator ∪ PK(each dominant entity set)   — applied recursively;
+cycles of identifying relationships are not allowed</pre>
+
+<h3>4 · General cardinality constraints</h3>
+
+<p>An edge can carry a label <b>(lower, upper)</b> stating how many relationships each
+entity of that entity set must/may participate in; <code>N</code> as the upper bound
+means unbounded. The label is written on the edge of the entity set it constrains —
+e.g. <code>(6,50)</code> on the SECTION side of EnrolledIn means each section has
+between 6 and 50 enrolled students.</p>
+`,
+  tasks: [
+    { quiz: true,
+      prompt: "In an ER diagram, how is the primary key of a (strong) entity set indicated?",
+      choices: ["A double boundary", "Underlined attribute names", "A dashed underline", "An arrowhead"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "An arrow from relationship set R into entity set E means:",
+      choices: ["Every E entity must participate in R",
+                "Each entity on the other side of R relates to at most one E entity",
+                "E is a weak entity set",
+                "R has an attribute stored in E"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "Does an N:1 relationship type require every entity on the N side to participate?",
+      choices: ["Yes — relationship types imply mandatory participation",
+                "No — none of the binary relationship types imply mandatory participation",
+                "Only if the relationship has attributes",
+                "Only for 1:1 relationships"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "What is the primary key of a weak entity set?",
+      choices: ["Its discriminator alone",
+                "The primary key of the dominant entity set alone",
+                "Its discriminator together with the primary keys of the dominant entity set(s)",
+                "It has no primary key"],
+      answer: 2 },
+    { quiz: true,
+      prompt: "A label (0,N) on the edge between entity set E and relationship set R means:",
+      choices: ["E entities participate in R at most N times, where N is a fixed constant",
+                "Each E entity participates in R any number of times, possibly none",
+                "Each E entity participates exactly once",
+                "R relates N different entity sets"],
+      answer: 1 }
+  ]
+},
+
+/* ============================================================ Lesson 28 */
+{
+  id: 28, part: PART5, type: "reading",
+  title: "Extended ER: specialization, generalization and aggregation",
+  html: `
+<p>The extended ER model adds richer attribute types and ways to build higher-level
+structure out of entity and relationship sets.</p>
+
+<h3>Structured attributes</h3>
+
+<p>A <b>composite</b> attribute has named component parts (Address = Street + City +
+PostalCode). A <b>multi-valued</b> attribute (drawn with a double oval) can hold several
+values per entity (Degrees of a professor).</p>
+
+<h3>Aggregation</h3>
+
+<p><b>Aggregation</b> treats a relationship set as a higher-level <em>entity set</em>,
+so that it can itself participate in relationships. Both views are retained: the
+aggregate is still a relationship among its participants, <em>and</em> it can be related
+to other entity sets. Example: the EnrolledIn relationship (Student–Section) aggregated
+so a TA can be assigned to particular enrolments.</p>
+
+<h3>Specialization and generalization</h3>
+
+<p><b>Specialization</b> (top-down) carves special cases out of an entity set: an
+<b>ISA</b> triangle connects the subclass to its superclass; every entity of the
+subclass is also an entity of the superclass and inherits its attributes and
+relationships. <b>Generalization</b> (bottom-up) merges several entity sets into a
+common superclass.</p>
+
+<pre class="out">        ┌─────────┐
+        │ SECTION │
+        └────┬────┘
+            ╱▲╲  ISA
+        ┌────┴─────────┐
+        │ OFF-SITE     │───(Location)
+        │ SECTION      │
+        └──────────────┘</pre>
+
+<p>Two annotations govern the subclasses: by default subclasses are assumed
+<b>disjoint</b> — an entity belongs to at most one — unless marked <b>OVERLAPS</b>; and
+a <b>COVERS</b> annotation says every superclass entity belongs to some subclass
+(with generalization, COVERS is always assumed).</p>
+
+<h3>Reification</h3>
+
+<p>Any n-ary relationship set can be <b>reified</b>: replaced by a new entity set plus
+<em>n</em> binary relationship sets, each with a <code>(1,1)</code> cardinality from the
+new entity set to one original participant. This is why binary relationships suffice in
+principle.</p>
+`,
+  tasks: [
+    { quiz: true,
+      prompt: "What does aggregation let you do?",
+      choices: ["Merge several entity sets into one",
+                "Treat a relationship set as a higher-level entity set that can itself participate in relationships",
+                "Compute COUNT/SUM/AVG in ER diagrams",
+                "Split an entity set into disjoint subclasses"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "What distinguishes specialization from generalization?",
+      choices: ["Specialization is bottom-up; generalization is top-down",
+                "Specialization is top-down (splitting out special cases); generalization is bottom-up (merging into a superclass)",
+                "Only specialization uses the ISA triangle",
+                "Only generalization allows inherited attributes"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "By default, subclasses under an ISA hierarchy are…",
+      choices: ["overlapping, unless marked DISJOINT",
+                "disjoint, unless marked OVERLAPS",
+                "covering, unless marked PARTIAL",
+                "unrelated to the superclass key"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "The COVERS annotation states that…",
+      choices: ["subclasses share no entities",
+                "every entity of the superclass belongs to at least one subclass",
+                "the subclass inherits the superclass's attributes",
+                "the superclass has a composite key"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "Reifying an n-ary relationship set produces…",
+      choices: ["one new entity set and n binary relationship sets with (1,1) cardinalities to the participants",
+                "n new entity sets and one binary relationship set",
+                "a weak entity set with n discriminators",
+                "an aggregation of n entity sets"],
+      answer: 0 }
+  ]
+},
+
+/* ============================================================ Lesson 29 */
+{
+  id: 29, part: PART5, type: "reading",
+  title: "ER design methodology and the registrar case study",
+  html: `
+<p>The lecture closes Module 7 with rules of thumb for making modelling choices and a
+step-by-step methodology, illustrated on a university registrar's office.</p>
+
+<h3>Attribute or entity set?</h3>
+
+<p>Model a concept as an <b>entity set</b> (rather than an attribute) if <em>any</em> of
+these hold: it has properties of its own beyond a single value; several entities need to
+share it; it participates in relationships of its own; it can be missing for some
+entities; it can have several values for one entity; its values are entities in their
+own right. Otherwise keep it as an attribute.</p>
+
+<h3>Design methodology</h3>
+
+<pre class="out">1. Recognize entity sets
+2. Recognize relationship sets and the participating entity sets
+3. Recognize attributes of entity and relationship sets
+4. Determine relationship types and existence dependencies
+5. Determine general cardinality constraints, keys and discriminators
+   — and keep a log of all assumptions made along the way</pre>
+
+<h3>Case study: the registrar's office</h3>
+
+<p>Requirements: courses with sections offered each term; professors teach sections;
+students enrol in sections and receive marks; some sections are held off-site at a
+location.</p>
+
+<pre class="out">COURSE (CourseNum, CourseName)
+   │ (0,N)
+   ◇◇ SectionOf ◇◇  (identifying)
+   │ (1,1)
+╔══════════╗  discriminators: Term, SectionNum (dashed underline)
+║ SECTION  ║──◇ TaughtBy ◇──▶ PROFESSOR (ProfNum, ProfName)
+╚══════════╝     (1,1)
+   │ (6,50)
+   ◇ EnrolledIn ◇──(Mark)── STUDENT (StudentNum, StudentName, GPA)
+   ╱▲╲ ISA
+ OFF-SITE SECTION ──(Location)</pre>
+
+<p>Key observations from the case study: SECTION is a <b>weak entity set</b> — a section
+only exists as a section <em>of</em> a course, so its primary key is
+{CourseNum, Term, SectionNum} (dominant key + discriminators). Each section is taught by
+exactly one professor: <code>(1,1)</code> into PROFESSOR. <code>Mark</code> is an
+attribute of <b>EnrolledIn</b>, since a mark describes a (student, section) pair, not a
+student or a section alone. The <code>(6,50)</code> label sits on the <b>SECTION</b>
+edge of EnrolledIn: each section has between 6 and 50 students. Off-site sections form a
+specialization of SECTION carrying the extra <code>Location</code> attribute.</p>
+`,
+  tasks: [
+    { quiz: true,
+      prompt: "Which observation argues for modelling a concept as an entity set rather than an attribute?",
+      choices: ["It always has exactly one value per entity",
+                "It has properties of its own or participates in its own relationships",
+                "It is a number rather than a string",
+                "It appears in only one relation"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "In the registrar design, what is the primary key of SECTION?",
+      choices: ["{SectionNum}",
+                "{Term, SectionNum}",
+                "{CourseNum, Term, SectionNum}",
+                "{CourseNum}"],
+      answer: 2 },
+    { quiz: true,
+      prompt: "Why is Mark an attribute of the EnrolledIn relationship set?",
+      choices: ["Because marks are optional",
+                "Because a mark describes a particular (student, section) pair, not a student or a section alone",
+                "Because STUDENT already has too many attributes",
+                "Because Mark is multi-valued"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "The constraint “each section has between 6 and 50 students” is drawn as…",
+      choices: ["(6,50) on the STUDENT edge of EnrolledIn",
+                "(6,50) on the SECTION edge of EnrolledIn",
+                "an arrow from EnrolledIn into STUDENT",
+                "a double boundary on SECTION"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "What is the final step of the design methodology (after entity sets, relationship sets, attributes and relationship types)?",
+      choices: ["Draw the physical schema",
+                "Normalize to BCNF",
+                "Determine general cardinality constraints, keys and discriminators — logging all assumptions",
+                "Write the CREATE TABLE statements"],
+      answer: 2 }
+  ]
+},
+
+/* ============================================================ Lesson 30 */
+{
+  id: 30, part: PART6, type: "reading",
+  title: "The red words: every highlighted term from lecture",
+  html: `
+<p>The slides highlight their key terminology in <b class="rw">red</b>. This final lesson
+collects <em>every</em> red term from all five handouts (extracted from the PDFs
+directly), with a one-line definition each, followed by a self-check quiz on the ones
+most likely to show up as "define / distinguish" questions.</p>
+
+<h3>Module 3 · Basic SQL</h3>
+
+<p><b class="rw">data types</b> / <b class="rw">data type constraints</b> — every column
+must be given an SQL data type (<code>integer</code>, <code>smallint</code>,
+<code>decimal(m,n)</code>, <code>float</code>, <code>char(n)</code>,
+<code>varchar(n)</code>, <code>date</code>, <code>time</code>); together with
+<code>not null</code>, <code>primary key</code> and <code>foreign key</code> these are
+the four common constraint varieties in <code>CREATE TABLE</code>.</p>
+
+<p><b class="rw">correlations</b> and <b class="rw">attributes</b> — SQL's replacement
+for the calculus's positional variables: <code>R as p</code> stands for
+R(p.a<sub>1</sub>, …, p.a<sub>k</sub>) where a<sub>i</sub> are the declared
+<b class="rw">attribute names</b>. A relation can serve as its own correlation when
+<b class="rw">unambiguous</b>. Two tables cannot <b class="rw">share</b> a variable —
+you must write the equality explicitly
+(<code>r1.publication = r2.publication</code>).</p>
+
+<p><b class="rw">expressions</b> — the SELECT clause can <b class="rw">create</b> new
+values using <b class="rw">built-in</b> functions (arithmetic, <code>||</code>,
+<code>substr</code>, constants, UDFs); every attribute mentioned must come from the
+FROM clause.</p>
+
+<p><b class="rw">set operations</b> — <b class="rw">UNION</b>, <b class="rw">EXCEPT</b>,
+<b class="rw">INTERSECT</b>: how SQL expresses ∨ and ¬ (and hence ∀, via rewriting)
+while keeping queries range-restricted.</p>
+
+<p><b class="rw">naming</b> — the <code>WITH</code> mechanism assigns names to query
+results so they can be used in place of base relations. In "old" SQL-89, subqueries in
+FROM did not exist — <b class="rw">views were the only option</b>.</p>
+
+<p><b class="rw">≡</b> — two equivalences to know cold:
+<code>= SOME (Q)</code> ≡ <code>IN (Q)</code> and
+<code>&lt;&gt; ALL (Q)</code> ≡ <code>NOT IN (Q)</code>.</p>
+
+<p><b class="rw">truth</b> of a parametric (correlated) subquery — determined once per
+substitution (tuple) of the main query: instantiate the parameters, then evaluate.
+Subqueries <b class="rw">CANNOT</b> be used to produce <b class="rw">results</b> —
+attributes present only in the subquery <b class="rw">cannot be used</b> in the output —
+and <b class="rw">input parameters</b> must be bound in the main query. WHERE subqueries
+formulate queries of the shape <b class="rw">"all x in R such that (a part of) x doesn't
+appear in S"</b>.</p>
+
+<p><b class="rw">must</b> — the GROUP BY rule: every attribute in SELECT that is not
+inside an aggregate <em>must</em> appear in the GROUP BY clause.</p>
+
+<p><b class="rw">Not quite correct</b> — the classic aggregation trap: computing
+per-author page counts by joining first silently drops authors with zero articles
+(author 2 should be reported with 0). The fix is an outer join before grouping.</p>
+
+<p><b class="rw">OLTP</b> — on-line transaction processing (reservations, electronic
+funds transfer): the reason SQL supports small-scale incremental INSERT / DELETE /
+UPDATE.</p>
+
+<h3>Module 4 · Relational Algebra</h3>
+
+<p><b class="rw">client/server architecture</b> — applications send SQL to the database
+server and get answers back; everything below the SQL interface is the server's
+business.</p>
+
+<p><b class="rw">relational algebra (RA)</b> — a <b class="rw">set of operations</b> on
+relations; the procedural language that declarative SQL is translated into. The
+optimizer produces a <b class="rw">query plan</b> built from
+<b class="rw">physical relational operators</b>, and <b class="rw">access methods</b>
+retrieve the rows of stored relations.</p>
+
+<p>The operations: <b class="rw">relation name</b>, <b class="rw">constant</b> relation
+(<code>a = c</code>), <b class="rw">selection</b> σ, <b class="rw">projection</b> π,
+<b class="rw">rename</b> ρ, <b class="rw">cross product</b> ×,
+<b class="rw">union</b> ∪ and <b class="rw">(set) difference</b> −.</p>
+
+<h3>Module 5 · Advanced SQL</h3>
+
+<p><b class="rw">updatable</b> / <b class="rw">implicitly defined</b> — only some views
+are updatable; SQL-92's restrictive conditions guarantee that updates to the underlying
+tables are <em>implicitly defined</em> by the view update (deciding this in general is
+undecidable).</p>
+
+<p><b class="rw">elim</b> / <b class="rw">DISTINCT</b> — multiset semantics is assumed
+for ∃ in the calculus; the condition <code>elim φ</code> removes duplicates, and
+<code>SELECT [DISTINCT]</code> is exactly an optional <code>[elim]</code>.</p>
+
+<p>Multiset multiplicities (how many copies survive): ∧ gives
+<b class="rw">m<sub>1</sub> · m<sub>2</sub></b>, ∨ gives
+<b class="rw">m<sub>1</sub> + m<sub>2</sub></b>, ∧¬ gives
+<b class="rw">max(0, m<sub>1</sub> − m<sub>2</sub>)</b>, ∃ sums the multiplicities over
+the domain, and <code>elim</code> yields <b class="rw">1</b>. The matching operations
+are <b class="rw">UNION ALL</b>, <b class="rw">EXCEPT ALL</b> and
+<b class="rw">INTERSECT ALL</b>.</p>
+
+<p><b class="rw">Value inapplicable</b> vs <b class="rw">value unknown</b> — the two
+meanings of NULL: Sue has no home phone, vs Sue has one but we don't know it.</p>
+
+<p><b class="rw">possible worlds</b> / <b class="rw">all</b> — an unknown value could be
+any domain value, giving many possible worlds; the <em>certain answers</em> are those
+true in <em>all</em> possible worlds. Computing them is NP-hard to undecidable, so SQL
+settles for an approximation: 3-valued logic.</p>
+
+<p><b class="rw">non-deterministic</b> / <b class="rw">deterministic</b> —
+<code>LIMIT</code> returns the first e<sub>1</sub> answers under <em>some</em> total
+order, so its semantics is non-deterministic; it becomes deterministic only when an
+<code>ORDER BY</code> induces a total order.</p>
+
+<h3>Module 6 · Embedded SQL</h3>
+
+<p><b class="rw">embedded</b> in a <b class="rw">host language</b> — SQL statements
+written inside C/C++/… source, preprocessed into a pure host program with library
+calls. <b class="rw">Reminder:</b> for DB2 the result is bound to a particular server
+engine; <b class="rw">warning:</b> not all RDBMSs compile at preprocessing time — some
+just generate CLI calls.</p>
+
+<p><b class="rw">EXEC SQL</b> — the prefix on every embedded statement; including the
+<b class="rw">SQLCA</b> (communication area) is <b class="rw">required</b>. Host
+variables live between <b class="rw">BEGIN / END DECLARE SECTION</b>.</p>
+
+<p><b class="rw">WHENEVER SQLERROR / SQLWARNING / NOT FOUND GO TO label</b> —
+declarative handlers over <code>sqlcode</code> instead of checking it after every
+statement.</p>
+
+<p><b class="rw">indicator</b> variables — paired with a host variable to capture NULL
+(indicator &lt; 0); fetching a NULL without one is a <b class="rw">run-time
+error</b>.</p>
+
+<p><b class="rw">cursor</b> — <code>DECLARE … CURSOR FOR</code>, <code>OPEN</code>,
+<code>FETCH … INTO</code> in a loop, <code>CLOSE</code>: the iterator protocol that
+bridges set-at-a-time SQL and one-tuple-at-a-time host code.</p>
+
+<p><b class="rw">SQL/PSM</b> — the SQL standard's procedural language for writing
+stored procedures inside the server.</p>
+
+<p><b class="rw">environment</b>, <b class="rw">connection</b>,
+<b class="rw">statement</b> — the three kinds of ODBC handles; exactly one environment
+per application thread, so a thread has at most one ongoing transaction.</p>
+
+<h3>Module 7 · The ER Model</h3>
+
+<p><b class="rw">entities</b>, <b class="rw">attributes</b>,
+<b class="rw">relationships</b> — the three ingredients of an ER schema.</p>
+
+<p>The four graphical constraint varieties: <b class="rw">primary keys</b>,
+<b class="rw">binary relationship types</b>, <b class="rw">existence
+dependencies</b> and <b class="rw">general cardinality constraints</b>
+(<code>(lower,upper)</code> edge labels; upper bound <code>N</code> = unbounded).</p>
+
+<p><b class="rw">existence dependent</b> — if x is existence dependent on y, y is the
+<em>dominant</em> entity and x the <em>subordinate</em> one (double boundaries;
+transactions depend on accounts).</p>
+
+<p>Formal ER databases — the universe is a domain of disjoint
+<b class="rw">finite strings</b> S and <b class="rw">entities</b> E, with
+<b class="rw">constants</b> for each string. For each of <b class="rw">entity sets</b>,
+<b class="rw">attributes</b> and <b class="rw">relationship sets</b>:
+the <b class="rw">intension</b> is the predicate name and its arity (R/k), the
+<b class="rw">extension</b> is its actual set of tuples. A database is a
+<b class="rw">signature</b> (metadata: the finite set of predicate names) plus an
+<b class="rw">instance</b> (data: an extension for each name).</p>
+
+<p><b class="rw">reification</b> — replacing a relationship set with a new entity set
+plus binary relationships to each participant; how relationship attributes are mapped
+to a relational signature.</p>
+
+<p>The EER features: <b class="rw">structured attributes</b>,
+<b class="rw">aggregation</b> (a relationship set is <b class="rw">aggregated</b> so
+its relationships become higher-level entities that participate in other
+relationships), <b class="rw">specialization</b>, <b class="rw">generalization</b>,
+<b class="rw">disjointness</b>.</p>
+`,
+  tasks: [
+    { quiz: true,
+      prompt: "“<attr> = some (<query>)” is equivalent to…",
+      choices: ["<attr> in (<query>)",
+                "<attr> not in (<query>)",
+                "exists (<query>)",
+                "<attr> = all (<query>)"],
+      answer: 0 },
+    { quiz: true,
+      prompt: "Attributes that appear only inside a WHERE subquery…",
+      choices: ["can be output if given an alias",
+                "cannot be used to construct the query's results",
+                "are automatically added to GROUP BY",
+                "must be primary keys"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "OLTP stands for…",
+      choices: ["on-line table partitioning",
+                "on-line transaction processing",
+                "optimized logical table plan",
+                "on-line transfer protocol"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "In the query evaluation pipeline, a query plan is composed of…",
+      choices: ["SELECT blocks",
+                "physical relational operators",
+                "possible worlds",
+                "host variables"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "Under multiset semantics, if φ holds m₁ times and ψ holds m₂ times, then φ ∧ ¬ψ holds…",
+      choices: ["m₁ · m₂ times",
+                "m₁ + m₂ times",
+                "max(0, m₁ − m₂) times",
+                "exactly once"],
+      answer: 2 },
+    { quiz: true,
+      prompt: "The two lecture meanings of a NULL value are…",
+      choices: ["value inapplicable and value unknown",
+                "value zero and value missing",
+                "syntactic and semantic NULL",
+                "deterministic and non-deterministic"],
+      answer: 0 },
+    { quiz: true,
+      prompt: "A certain answer to a query over an incomplete database is one that is…",
+      choices: ["true in at least one possible world",
+                "true in all possible worlds",
+                "returned by SQL's 3-valued logic",
+                "true in the world where NULL = 0"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "LIMIT without ORDER BY has which semantics?",
+      choices: ["Deterministic — rows come in insertion order",
+                "Non-deterministic — the first answers under any total order the results extend to",
+                "Undefined — it is a syntax error",
+                "Deterministic — rows come in primary-key order"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "The term “elim” in range-restricted calculus corresponds to which SQL keyword?",
+      choices: ["EXCEPT", "DISTINCT", "UNIQUE", "GROUP BY"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "SQL/PSM is…",
+      choices: ["the SQL standard's procedural language for stored procedures",
+                "a call-level interface like ODBC",
+                "the preprocessor for embedded SQL",
+                "SQL's permission-management subsystem"],
+      answer: 0 },
+    { quiz: true,
+      prompt: "If x is existence dependent on y, then…",
+      choices: ["x is dominant and y is subordinate",
+                "y is dominant and x is subordinate",
+                "x and y must be the same entity set",
+                "y must be a weak entity set"],
+      answer: 1 },
+    { quiz: true,
+      prompt: "In the formal definition of ER databases, the extension of a predicate is…",
+      choices: ["its name and arity",
+                "its actual set of tuples (the interpretation)",
+                "the finite set of all predicate names",
+                "the set of constants in the universe"],
+      answer: 1 }
   ]
 }
 ];

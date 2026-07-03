@@ -1,12 +1,16 @@
 # CS348Bolt — Interactive lessons for Midterm 2
 
-A SQLBolt-style tutorial site covering the three lecture handouts:
+A SQLBolt-style tutorial site covering the five lecture handouts:
 
 - **Part 1 (Lessons 1–12):** Module 3 — Basic SQL
 - **Part 2 (Lessons 13–17):** Module 4 — Relational Algebra
 - **Part 3 (Lessons 18–23):** Module 5 — Advanced SQL
+- **Part 4 (Lessons 24–25):** Module 6 — Embedded SQL (reading + self-check
+  quizzes; concepts and terminology only, no code/syntax, per the professor)
+- **Part 5 (Lessons 26–29):** Module 7 — The ER Model (reading + self-check
+  quizzes)
 
-Every lesson uses the lecture schemas (the bibliography database and the
+Every SQL/RA lesson uses the lecture schemas (the bibliography database and the
 ACCOUNT/BANK instance) on an extended data set: all slide rows are present,
 plus extra authors, publications, accounts and banks, so exercises can't be
 passed by accident and are pitched at midterm-prep difficulty. Example outputs
